@@ -1,0 +1,25 @@
+import { IronSession, getIronSession } from "iron-session";
+import { cookies } from "next/headers";
+
+export type SessionData = {
+  userId?: string;
+};
+
+const sessionOptions = {
+  password: process.env.SESSION_SECRET || "dev-secret-change-me-please-1234567890",
+  cookieName: "study_assistant_session",
+  cookieOptions: {
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    httpOnly: true,
+    path: "/",
+  },
+};
+
+export async function getSession(): Promise<IronSession<SessionData>> {
+  const cookieStore = await cookies();
+  // @ts-expect-error next/headers cookie store is compatible
+  return getIronSession<SessionData>(cookieStore, sessionOptions);
+}
+
+

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -24,10 +25,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-hidden`}>
+        <nav className="fixed top-0 inset-x-0 z-50 px-6 py-3">
+          <div className="mx-auto max-w-6xl flex items-center justify-between rounded-2xl border border-white/20 bg-white/10 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+            <Link href="/" className="px-4 py-2 font-semibold text-foreground">Study Assistant</Link>
+            <div className="flex items-center gap-1 pr-2">
+              <Link href="/login" className="px-3 py-2 text-sm text-foreground/90 hover:text-foreground transition">Login</Link>
+              <Link href="/signup" className="px-3 py-2 text-sm text-foreground/90 hover:text-foreground transition">Signup</Link>
+              <Link href="/dashboard" className="px-3 py-2 text-sm text-foreground/90 hover:text-foreground transition">Dashboard</Link>
+            </div>
+          </div>
+        </nav>
+        <div className="fixed inset-0 pt-16 overflow-hidden">{children}</div>
       </body>
     </html>
   );
