@@ -1,8 +1,10 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const EASE_SMOOTH = [0.23, 0.86, 0.39, 0.96] as const;
 
 function ElegantShape({
   className,
@@ -21,14 +23,14 @@ function ElegantShape({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: -150, rotate: rotate - 15 }}
-      animate={{ opacity: 1, y: 0, rotate: rotate }}
-      transition={{ duration: 2.4, delay, ease: [0.23, 0.86, 0.39, 0.96], opacity: { duration: 1.2 } }}
+        initial={{ opacity: 0, y: -150, rotate: rotate - 15 }}
+        animate={{ opacity: 1, y: 0, rotate: rotate }}
+        transition={{ duration: 2.4, delay, ease: EASE_SMOOTH, opacity: { duration: 1.2 } }}
       className={cn("absolute", className)}
     >
       <motion.div
-        animate={{ y: [0, 15, 0] }}
-        transition={{ duration: 12, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+          animate={{ y: [0, 15, 0] }}
+          transition={{ duration: 12, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
         style={{ width, height }}
         className="relative"
       >
@@ -59,12 +61,14 @@ export function HeroGeometric({
   title2?: string;
   fullHeight?: boolean;
 }) {
-  const fadeUpVariants = {
+  const EASE_SMOOTH = [0.23, 0.86, 0.39, 0.96] as const;
+  const EASE_FADEUP = [0.25, 0.4, 0.25, 1] as const;
+  const fadeUpVariants: Variants = {
     hidden: { opacity: 0, y: 30 },
     visible: (i: number) => ({
       opacity: 1,
       y: 0,
-      transition: { duration: 1, delay: 0.5 + i * 0.2, ease: [0.25, 0.4, 0.25, 1] },
+      transition: { duration: 1, delay: 0.5 + i * 0.2, ease: EASE_FADEUP },
     }),
   } as const;
 
