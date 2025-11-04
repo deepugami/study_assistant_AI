@@ -5,7 +5,9 @@ let genAI: GoogleGenerativeAI | null = null;
 function ensureGenAI(): GoogleGenerativeAI | null {
 	const key = process.env.API_KEY;
 	if (!key) return null;
-	if (!genAI) genAI = new GoogleGenerativeAI(key);
+	if (!genAI) {
+		genAI = new GoogleGenerativeAI(key);
+	}
 	return genAI;
 }
 
@@ -28,31 +30,103 @@ export async function embedText(input: string): Promise<number[]> {
 	if (!client) {
 		return localEmbed(input);
 	}
-	const model = client.getGenerativeModel({ model: "text-embedding-004" });
-	const resp = await model.embedContent(input);
-	// @ts-expect-error library typing sometimes lags
-	return resp.embedding.values as number[];
+	try {
+		if (String(process.env.AI_EMBED_LOCAL || "").toLowerCase() === "true") {
+			return localEmbed(input);
+		}
+		const embedModel = process.env.AI_EMBED_MODEL || "text-embedding-004";
+		const model = client.getGenerativeModel({ model: embedModel });
+		const resp = await model.embedContent(input);
+		// Typings may vary; treat as any and cast
+	return (resp as any).embedding.values as number[];
+	} catch (_e) {
+		// Fallback to local embedding on any failure to keep core features working offline
+		return localEmbed(input);
+	}
 }
 
 export async function generateText(prompt: string): Promise<string> {
-	const client = ensureGenAI();
-	if (!client) throw new Error("Missing API_KEY for text generation");
-	const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
-	const result = await model.generateContent(prompt);
-	const text = await result.response.text();
-	return text;
+	const key = process.env.API_KEY;
+	if (!key) throw new Error("Missing API_KEY for text generation");
+	const preferred = process.env.AI_TEXT_MODEL || "gemini-2.5-flash";
+	const fallbacks = [preferred, "gemini-2.0-flash", "gemini-2.0-flash-001", "gemini-1.5-pro", "gemini-1.5-flash"];
+	let lastErr: unknown = null;
+	for (const model of fallbacks) {
+		try {
+			const url = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+			const body = {
+				contents: [{ role: "user", parts: [{ text: prompt }] }],
+			} as any;
+			const resp = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+			if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+			const json: any = await resp.json();
+			const candidates = json.candidates || [];
+			const parts = candidates[0]?.content?.parts || [];
+			const text = parts.map((p: any) => p.text).filter(Boolean).join("");
+			if (text && text.trim()) return text.trim();
+		} catch (e) {
+			lastErr = e;
+			continue;
+		}
+	}
+	throw lastErr instanceof Error ? lastErr : new Error("All text generation models failed (REST)");
+}
+
+async function callModelsREST(prompt: string, models: string[]): Promise<string> {
+	const key = process.env.API_KEY;
+	if (!key) throw new Error("Missing API_KEY for text generation");
+	let lastErr: unknown = null;
+	for (const model of models) {
+		try {
+			const url = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+			const body = { contents: [{ role: "user", parts: [{ text: prompt }] }] } as any;
+			const resp = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+			if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+			const json: any = await resp.json();
+			const parts = json.candidates?.[0]?.content?.parts || [];
+			const text = parts.map((p: any) => p.text).filter(Boolean).join("");
+			if (text && text.trim()) return text.trim();
+		} catch (e) {
+			lastErr = e;
+			continue;
+		}
+	}
+	throw lastErr instanceof Error ? lastErr : new Error("All models failed (REST)");
+}
+
+export async function generateTextSmart(prompt: string, opts?: { deep?: boolean }): Promise<string> {
+	const deep = Boolean(opts?.deep);
+	const preferred = process.env.AI_TEXT_MODEL || (deep ? "gemini-2.5-pro" : "gemini-2.5-flash");
+	const fallbacks = deep
+		? [preferred, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-001", "gemini-1.5-pro", "gemini-1.5-flash"]
+		: [preferred, "gemini-2.0-flash", "gemini-2.0-flash-001", "gemini-1.5-pro", "gemini-1.5-flash"];
+	return callModelsREST(prompt, fallbacks);
 }
 
 export async function generateJSON<T>(systemPrompt: string): Promise<T> {
-	const client = ensureGenAI();
-	if (!client) throw new Error("Missing API_KEY for JSON generation");
-	const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
-	const result = await model.generateContent(systemPrompt + "\nReturn ONLY valid JSON.");
-	const text = await result.response.text();
-	// Try to extract JSON if fenced
-	const match = text.match(/```json[\s\S]*?```/i);
-	const jsonText = match ? match[0].replace(/```json|```/gi, "").trim() : text.trim();
-	return JSON.parse(jsonText) as T;
+	const key = process.env.API_KEY;
+	if (!key) throw new Error("Missing API_KEY for JSON generation");
+	const preferred = process.env.AI_TEXT_MODEL || "gemini-2.5-flash";
+	const fallbacks = [preferred, "gemini-2.0-flash", "gemini-2.0-flash-001", "gemini-1.5-pro", "gemini-1.5-flash"];
+	let lastErr: unknown = null;
+	for (const model of fallbacks) {
+		try {
+			const url = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+			const body = { contents: [{ role: "user", parts: [{ text: systemPrompt + "\nReturn ONLY valid JSON." }] }] } as any;
+			const resp = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+			if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+			const json: any = await resp.json();
+			const parts = json.candidates?.[0]?.content?.parts || [];
+			const text = parts.map((p: any) => p.text).filter(Boolean).join("");
+			const match = text.match(/```json[\s\S]*?```/i);
+			const jsonText = match ? match[0].replace(/```json|```/gi, "").trim() : text.trim();
+			return JSON.parse(jsonText) as T;
+		} catch (e) {
+			lastErr = e;
+			continue;
+		}
+	}
+	throw lastErr instanceof Error ? lastErr : new Error("All JSON generation models failed (REST)");
 }
 
 

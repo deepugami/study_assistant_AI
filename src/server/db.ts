@@ -9,11 +9,20 @@ export type UserRow = {
 
 let db: Database.Database | null = null;
 
+function ensurePublicUser(database: Database.Database) {
+  database.exec(`INSERT OR IGNORE INTO users (id, email, passwordHash, createdAt)
+                 VALUES ('public', 'guest@local', '', CURRENT_TIMESTAMP);`);
+}
+
 export function getDb(): Database.Database {
-  if (db) return db;
+  if (db) {
+    try { ensurePublicUser(db); } catch {}
+    return db;
+  }
   db = new Database(process.env.SQLITE_PATH || "./data.sqlite");
   db.pragma("journal_mode = WAL");
   migrate(db);
+  try { ensurePublicUser(db); } catch {}
   return db;
 }
 
@@ -99,7 +108,26 @@ function migrate(database: Database.Database) {
       FOREIGN KEY(submissionId) REFERENCES test_submissions(id),
       FOREIGN KEY(questionId) REFERENCES test_questions(id)
     );
+
+    -- Ensure a default public user exists for auth-less operation
+    INSERT OR IGNORE INTO users (id, email, passwordHash, createdAt)
+    VALUES ('public', 'guest@local', '', CURRENT_TIMESTAMP);
+
+    CREATE TABLE IF NOT EXISTS qa_cache (
+      key TEXT PRIMARY KEY,
+      answer TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
   `);
+
+  // Lightweight migrations for new columns
+  try {
+    const cols = database.prepare("PRAGMA table_info(test_questions)").all() as Array<{ name: string }>;
+    const hasHint = cols.some(c => c.name === "hint");
+    if (!hasHint) {
+      database.exec("ALTER TABLE test_questions ADD COLUMN hint TEXT");
+    }
+  } catch {}
 }
 
 

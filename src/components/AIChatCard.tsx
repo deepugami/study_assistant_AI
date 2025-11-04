@@ -13,10 +13,16 @@ export default function AIChatCard({ className }: { className?: string }) {
     { sender: "ai", text: "👋 Hello! I’m your AI assistant." },
   ]);
   const [input, setInput] = useState("");
+  const [deep, setDeep] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
   async function handleSend() {
     if (!input.trim()) return;
+    // Pre-check for active docs to avoid AI calls; if none, do nothing (no toast on chat page)
+    try {
+      const state = await fetch("/api/state/active-docs").then(r => r.json()).catch(() => ({ hasActiveDocs: false }));
+      if (!state?.hasActiveDocs) return;
+    } catch { return; }
     const q = input.trim();
     setMessages(prev => [...prev, { sender: "user", text: q }]);
     setInput("");
@@ -26,7 +32,7 @@ export default function AIChatCard({ className }: { className?: string }) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: q }),
+        body: JSON.stringify({ message: q, deep }),
       });
       const data = await res.json().catch(() => ({}));
       const answer = data?.answer ?? "(no answer)";
@@ -96,6 +102,10 @@ export default function AIChatCard({ className }: { className?: string }) {
 
         {/* Input */}
         <div className="flex items-center gap-2 p-3 border-t border-white/10 relative z-10">
+          <label className="flex items-center gap-2 text-xs text-white/80">
+            <input type="checkbox" checked={deep} onChange={(e) => setDeep(e.target.checked)} />
+            Deep explanation
+          </label>
           <input
             className="flex-1 px-3 py-2 text-sm bg-black/50 rounded-lg border border-white/10 text-white focus:outline-none focus:ring-1 focus:ring-white/50"
             placeholder="Type a message..."
@@ -111,6 +121,7 @@ export default function AIChatCard({ className }: { className?: string }) {
           </button>
         </div>
       </div>
+
     </div>
   );
 }

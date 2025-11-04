@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const runtime = "nodejs";
 import { z } from "zod";
 import { getDb } from "@/server/db";
 import { v4 as uuid } from "uuid";

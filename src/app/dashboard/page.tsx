@@ -8,16 +8,11 @@ import { IoChatbubbleEllipsesOutline, IoHelpCircleOutline, IoCreateOutline, IoDo
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [lastUploaded, setLastUploaded] = useState<string[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    fetch("/api/auth/me").then(r => r.json()).then(d => {
-      if (!d.user) router.replace("/login"); else setUser(d.user);
-    });
-  }, [router]);
 
   function openFileDialog() {
     if (uploading) return;
@@ -33,7 +28,8 @@ export default function DashboardPage() {
     try {
       const res = await fetch("/api/upload", { method: "POST", body: form, credentials: "same-origin" });
       if (res.ok) {
-        alert("Uploaded and indexed.");
+        const names = Array.from(files).map(f => f.name);
+        setLastUploaded(names);
         setSelectedFiles(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
       } else {
@@ -51,21 +47,36 @@ export default function DashboardPage() {
     }
   }
 
+  async function guardNavigate(path: string) {
+    try {
+      const st = await fetch("/api/state/active-docs", { cache: "no-store" }).then(r => r.json()).catch(() => ({ hasActiveDocs: false }));
+      if (st?.hasActiveDocs) {
+        router.push(path);
+      } else {
+        setToast("Please upload a file on the dashboard first.");
+        setTimeout(() => setToast(null), 2500);
+      }
+    } catch {
+      setToast("Please upload a file on the dashboard first.");
+      setTimeout(() => setToast(null), 2500);
+    }
+  }
+
   const menuItems = [
-    { title: "Chat mode", icon: <IoChatbubbleEllipsesOutline />, gradientFrom: "#a955ff", gradientTo: "#ea51ff", onClick: () => router.push("/chat") },
-    { title: "MCQ mode", icon: <IoHelpCircleOutline />, gradientFrom: "#56CCF2", gradientTo: "#2F80ED", onClick: () => router.push("/test?mode=mcq") },
-    { title: "SA mode", icon: <IoCreateOutline />, gradientFrom: "#FF9966", gradientTo: "#FF5E62", onClick: () => router.push("/test?mode=short") },
-    { title: "LA mode", icon: <IoDocumentTextOutline />, gradientFrom: "#80FF72", gradientTo: "#7EE8FA", onClick: () => router.push("/test?mode=long") },
+    { title: "Chat mode", icon: <IoChatbubbleEllipsesOutline />, gradientFrom: "#a955ff", gradientTo: "#ea51ff", onClick: () => guardNavigate("/chat") },
+    { title: "MCQ mode", icon: <IoHelpCircleOutline />, gradientFrom: "#56CCF2", gradientTo: "#2F80ED", onClick: () => guardNavigate("/test?mode=mcq") },
+    { title: "SA mode", icon: <IoCreateOutline />, gradientFrom: "#FF9966", gradientTo: "#FF5E62", onClick: () => guardNavigate("/test?mode=short") },
+    { title: "LA mode", icon: <IoDocumentTextOutline />, gradientFrom: "#80FF72", gradientTo: "#7EE8FA", onClick: () => guardNavigate("/test?mode=long") },
     { title: "YouTube", icon: <IoLogoYoutube />, gradientFrom: "#ffa9c6", gradientTo: "#f434e2", disabled: true },
   ];
 
   return (
-    <div className="relative min-h-screen bg-white">
+    <div className="relative min-h-screen bg-black text-white">
       <BackgroundCircles title="" variant="senary" />
       <div className="absolute inset-0 flex flex-col gap-6 items-center justify-center w-full">
         <GlassFilter />
         <GradientMenu items={menuItems} />
-        <div className="bg-white/80 rounded-3xl p-4">
+        <div className="bg-white/80 rounded-3xl p-4 text-black">
           <input
             ref={fileInputRef}
             type="file"
@@ -79,11 +90,38 @@ export default function DashboardPage() {
             }}
           />
           <div className="h-4" />
-          <GlassButton onClick={openFileDialog} disabled={uploading}>
-            <span>{uploading ? "Uploading..." : "Upload documents"}</span>
-          </GlassButton>
+          <div className="flex items-center gap-3">
+            <GlassButton onClick={openFileDialog} disabled={uploading}>
+              <span>
+                {uploading
+                  ? "Uploading..."
+                  : lastUploaded.length > 0
+                    ? lastUploaded.join(", ")
+                    : "Upload documents"}
+              </span>
+            </GlassButton>
+            {lastUploaded.length > 0 && (
+              <button
+                type="button"
+                className="px-3 py-2 rounded-lg border border-black/10 bg-white hover:bg-black/5 text-black disabled:opacity-50"
+                onClick={() => {
+                  setLastUploaded([]);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                disabled={uploading}
+                title="Clear uploaded selection"
+              >
+                Delete
+              </button>
+            )}
+          </div>
         </div>
       </div>
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg bg-white/90 text-black shadow-lg">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

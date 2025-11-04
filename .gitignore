@@ -30,8 +30,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (do not commit secrets)
 .env*
+!.env.example
+
+# local db and cookies
+data.sqlite*
+cookie.txt
 
 # vercel
 .vercel

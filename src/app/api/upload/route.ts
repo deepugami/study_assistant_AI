@@ -20,7 +20,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Upload 1-3 files" }, { status: 400 });
     }
 
-    const db = getDb();
+  const db = getDb();
+  const uploadedDocIds: string[] = [];
     for (const file of files) {
       const name = file.name;
       const mime = file.type || "application/octet-stream";
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
       const now = new Date().toISOString();
       db.prepare("INSERT INTO documents (id, userId, name, mime, createdAt) VALUES (?, ?, ?, ?, ?)")
         .run(docId, session.userId, name, mime, now);
+      uploadedDocIds.push(docId);
 
       const chunks = chunkText(text);
       for (const ch of chunks) {
@@ -58,8 +60,11 @@ export async function POST(req: Request) {
           .run(uuid(), docId, ch, JSON.stringify(emb));
       }
     }
+    // Scope chat/test to the most recently uploaded files in this session
+    session.currentDocIds = uploadedDocIds;
+    await session.save();
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, currentDocIds: uploadedDocIds });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal Server Error";
     return NextResponse.json({ error: message }, { status: 500 });

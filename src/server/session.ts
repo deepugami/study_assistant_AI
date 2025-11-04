@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 
 export type SessionData = {
   userId?: string;
+  currentDocIds?: string[];
 };
 
 const sessionOptions = {
@@ -18,8 +19,13 @@ const sessionOptions = {
 
 export async function getSession(): Promise<IronSession<SessionData>> {
   const cookieStore = await cookies();
-  // @ts-expect-error next/headers cookie store is compatible
-  return getIronSession<SessionData>(cookieStore, sessionOptions);
+  const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
+  // Remove auth: ensure a default public user id so APIs can operate without login
+  if (!session.userId) {
+    session.userId = "public";
+    try { await session.save(); } catch {}
+  }
+  return session;
 }
 
 

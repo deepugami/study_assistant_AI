@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Study Assistant
 
-## Getting Started
+A local-first app to upload notes (PDF/DOCX/TXT), chat with them (RAG), and generate tests (MCQ/Short/Long).
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 22 LTS recommended. `better-sqlite3` is a native module.
+  - Windows: consider nvm-windows (https://github.com/coreybutler/nvm-windows)
+- SQLite database files are created locally in the project folder by default.
+
+### Environment
+
+Create `.env` (or `.env.local`) and set:
+
+- `API_KEY` — Google Generative AI API key (enables chat/test generation). Optional; tests/chat have fallbacks.
+- `SESSION_SECRET` — any long random string (sessions). Optional.
+- `SQLITE_PATH` — optional custom path to `data.sqlite`.
+
+### Run (dev)
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### How to use
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1) Go to Dashboard and upload 1–3 files (PDF/DOCX/TXT). Wait for processing to finish.
+2) Use the Dashboard buttons to navigate:
+   - Chat — ask grounded questions about your notes.
+   - Test — MCQ/Short/Long modes to generate and answer questions.
+   - If no file is uploaded, navigation is blocked and a toast appears on the Dashboard.
+3) After a full page refresh, the session clears the active docs for safety. Upload again to start a new session.
 
-## Learn More
+Notes:
+- With an API key, the app uses Gemini for generation; without it, tests fall back locally and chat provides a conservative fallback.
+- Data stays local in SQLite; uploads are parsed on your machine.
 
-To learn more about Next.js, take a look at the following resources:
+### Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `npm run dev` — start Next.js dev server
+- `npm run build` — production build
+- `npm start` — start production server
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Tech
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 15 (App Router, TypeScript), React 19, Tailwind v4
+- SQLite via better-sqlite3
+- `iron-session` for sessions (public mode by default)
+- Google Generative AI (Gemini) for text/JSON + embeddings (with local fallbacks)

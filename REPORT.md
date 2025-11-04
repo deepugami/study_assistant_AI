@@ -1,274 +1,740 @@
-## Study Assistant — Comprehensive Technical Report
+## Study Assistant — End‑to‑End Project Report (Frontend + RAG)
 
-### Overview
-Study Assistant is a personal learning companion that lets a student upload their own study materials (PDF, DOCX, TXT), indexes them locally with embeddings, and then:
-- Chat with a contextual AI over their materials (RAG: Retrieval-Augmented Generation)
-- Generate practice tests (MCQ, short, long answer) based entirely on those materials
+Written from the perspective of an engineering student who implemented the frontend and the Retrieval‑Augmented Generation (RAG) chat system, with a full understanding of the overall application.
 
-Authentication is session-based. All data is stored locally in SQLite. The AI layer uses Google Generative AI (Gemini) when an API key is provided; otherwise, a local embedding fallback keeps the app usable without cloud access (chat requires an API key).
+---
 
-### Problem Statement — What it solves
-- Students often have scattered notes across documents. Finding answers is slow.
-- Generic AI chat often hallucinates and does not respect a student’s own material.
-- Creating practice tests is time-consuming and rarely tailored to one’s notes.
+## Executive summary
 
-Study Assistant centralizes a student’s materials, grounds AI responses on them, and auto-generates practice tests, improving focus, recall, and preparation efficiency.
+Study Assistant is a personal learning app where a student can upload study materials (PDF, DOCX, TXT) and then:
+- Chat with an AI that answers strictly from their own notes (RAG).
+- Auto‑generate practice tests (MCQ, Short, Long) sourced from those notes.
 
-### How it works (end-to-end)
-1) Sign up / Log in
-- Credentials are stored with a hashed password (bcrypt) in SQLite.
-- A session cookie (`iron-session`) keeps users logged in.
+It’s built with Next.js 15 (App Router, TypeScript), React 19, Tailwind v4, and a lightweight local SQLite database (via better‑sqlite3). Authentication uses `iron-session`. For AI, it integrates Google Generative AI (Gemini) for text/JSON generation and embeddings, with an offline‑friendly local embedding fallback to keep ingestion and retrieval usable even without an API key.
 
-2) Upload documents (Dashboard → Upload)
-- Accepts 1–3 files per upload: PDF, DOCX, or TXT.
-- Text is extracted (pdf-parse, mammoth, or direct text), then chunked into overlapping segments.
-- Each chunk is embedded to a vector (Google "text-embedding-004" if `API_KEY` is set; otherwise a deterministic local fallback embedding).
-- Chunks + embeddings are stored in SQLite for the user.
+Why this matters: it turns scattered notes into a searchable, testable knowledge base so learners can study faster and with more confidence.
 
-3) Chat over your notes
-- When the user sends a message, the message is embedded and compared with all of their document chunks via cosine similarity.
-- Top-k relevant chunks form the context. The app prompts Gemini ("gemini-1.5-flash") to answer strictly from this context.
-- The response plus IDs of source chunks are returned to the UI.
+---
 
-4) Generate and take tests
-- The server samples the user’s chunk content and prompts the model to produce a JSON payload of questions.
-- Questions are stored in SQLite and fetched by the UI.
-- On submission: MCQs and short answers are auto-scored (exact-match for short); long answers are currently not LLM-graded (awarded 0 by design for now).
+## Recent changes (Nov 2025)
 
-5) Routing & protection (middleware)
-- Unauthenticated users are redirected from protected pages (`/dashboard`, `/chat`, `/test`) to `/login`.
-- Authenticated users are redirected from `/login` and `/signup` to `/dashboard`.
+- Background animation: added a full‑screen animated background (`BackgroundPathsOverlay`) to Chat and Test pages; fixed overlay so it covers the entire viewport.
+- Fresh session semantics: after a full browser refresh, previously uploaded “active docs” are cleared automatically (client component `SessionFreshReset` in `layout.tsx`). Regular navigation does not clear uploads.
+- Dashboard‑first gating: the Dashboard’s action buttons (Chat, MCQ, SA, LA) now check whether a file is uploaded. If not, navigation is blocked and a toast appears on the Dashboard itself. Chat/Test pages don’t show upload toasts.
+- Test generation reliability: added a local MCQ fallback generator (cloze‑style). Short/Long already had local fallbacks. With an API key, Test still uses Gemini; otherwise it falls back gracefully.
+- No past uploads reuse: Chat/Test won’t auto‑use old uploads after reload; you must upload again each fresh session.
 
-### Tech Stack
-- Web framework: Next.js 15 (App Router, TypeScript)
-- Runtime: Node.js (for API routes and file processing)
-- UI: React 19, Tailwind CSS v4, Framer Motion, `lucide-react`, `react-icons`
-- Auth/session: `iron-session`
-- Database: SQLite via `better-sqlite3`
-- Validation: `zod`
-- Crypto: `bcryptjs`
-- AI: Google Generative AI (`@google/generative-ai`) for text generation and embeddings; local embedding fallback implemented
-- Parsing: `pdf-parse`, `mammoth` (DOCX)
-- Tooling: Turbopack (`next dev --turbopack`), ESLint 9
+## Goals and problem statement
 
-Note: `langchain` packages are present but not currently used by the core flows.
+Problems I wanted to solve:
+- Searching notes is slow and manual, especially near exams.
+- Generic chatbots hallucinate and don’t respect my materials.
+- Making practice tests is tedious and rarely aligned with what I actually studied.
 
-### Dependencies (versions and purpose)
-- `next@15.5.2`: App Router, API routes, middleware
-- `react@19.1.0`, `react-dom@19.1.0`: UI framework and renderer
-- `tailwindcss@^4`, `@tailwindcss/postcss@^4`: styling via Tailwind v4 with PostCSS plugin
-- `framer-motion@^12.23.12`: animations
-- `lucide-react@^0.542.0`, `react-icons@^5.5.0`: icon sets
-- `clsx@^2.1.1`: conditional classNames
-- `iron-session@^8.0.4`: stateless, signed, HTTP-only session cookies
-- `better-sqlite3@^11.10.0`: fast SQLite bindings for Node.js
-- `zod@^3.25.76`: runtime input validation
-- `bcryptjs@^3.0.2`: password hashing (pure JS)
-- `uuid@^12.0.0`: ID generation
-- `@google/generative-ai@^0.24.1`: Gemini models (text, embeddings)
-- `pdf-parse@^1.1.1`: PDF text extraction
-- `mammoth@^1.10.0`: DOCX text extraction
-- `multer@^2.0.2`: present but not used (upload handled via Web API `formData()`)
-- `cosine-similarity@^1.0.1`: cosine similarity utility (used in `rag.ts` helpers)
-- `langchain@^0.3.33`, `@langchain/community@^0.3.55`, `@langchain/google-genai@^0.2.17`: installed but not used in core logic
-- Dev: `eslint@^9`, `eslint-config-next@15.5.2`, `@eslint/eslintrc@^3`, `typescript@^5`, `@types/*@`: linting and types
+Project goals:
+- Centralize personal study materials in one place, locally.
+- Ground all AI answers on my uploaded content (RAG) to reduce hallucinations.
+- Generate targeted practice tests from the same materials.
+- Keep setup minimal (no managed services required) and preserve privacy by default.
 
-### Data model (SQLite)
-Tables are created on first run (`src/server/db.ts`).
-- `users(id, email, passwordHash, createdAt)`
-- `documents(id, userId, name, mime, createdAt)`
-- `chunks(id, documentId, content, embedding)` — `embedding` stored as JSON array string
-- `chats(id, userId, createdAt)` — reserved for future chat history (not yet used)
-- `messages(id, chatId, role, content, createdAt)` — reserved for future chat history
-- `tests(id, userId, mode, durationSec, createdAt)`
-- `test_questions(id, testId, type, question, options, answerKey, maxScore)`
-- `test_submissions(id, testId, userId, startedAt, submittedAt, score)`
-- `test_answers(id, submissionId, questionId, answer, scoreAwarded)`
+---
 
-### API Reference (server routes)
-- Auth
-  - `POST /api/auth/signup` → create account, set session
-  - `POST /api/auth/login` → login, set session
-  - `POST /api/auth/logout` → destroy session
-  - `GET  /api/auth/me` → current user profile or null
+## System architecture (high‑level)
 
-- Documents & RAG
-  - `POST /api/upload` (multipart FormData: `files`) → parse, chunk, embed, store
-  - `POST /api/chat` ({ message }) → RAG retrieval over user chunks, LLM answer
+Key flows: Upload → Ingest → Chunk → Embed → Store → Retrieve → Prompt → Generate → Display.
 
-- Testing
-  - `POST /api/test` ({ mode, durationSec, numQuestions }) → generate test, returns `testId`
-  - `GET  /api/test-questions?testId=...` → fetch generated questions
-  - `PUT  /api/test` ({ testId, answers }) → submit answers and get score
+ASCII overview:
 
-### Deep dive: Core modules and logic
+```
+[Client (Next.js/React)]
+   ├── Upload files  ──────────────▶  POST /api/upload
+   │                                 └─ parse (pdf-parse/mammoth/txt)
+   │                                    chunk (word window + overlap)
+   │                                    embed (Gemini or local fallback)
+   │                                    persist (SQLite: documents + chunks)
+   │
+   ├── Chat message ───────────────▶  POST /api/chat
+   │                                 └─ embed query
+   │                                    cosine similarity over chunks
+   │                                    construct grounded prompt
+   │                                    generate answer (Gemini)
+   │                                    return answer + source chunk IDs
+   │
+   └── Test lifecycle ─────────────▶  POST/GET/PUT /api/test + /api/test-questions
+                                     └─ sample chunk text
+                           generate JSON questions (Gemini; local fallback on failure)
+                                        store questions
+                                        submit + score
 
-- `src/server/db.ts` — database lifecycle and schema
-  - Creates all tables at startup using `better-sqlite3` and WAL mode for durability.
-  - Central `getDb()` memoizes the DB handle and invokes `migrate()` once.
+[SQLite (better-sqlite3)]
+  ├─ users           ├─ documents
+  ├─ chunks (text + embedding JSON)
+  ├─ tests           ├─ test_questions
+  ├─ test_submissions └─ test_answers
 
-- `src/server/session.ts` — sessions
-  - `iron-session` with cookie `study_assistant_session`, `SameSite=Lax`, `secure` in production, `httpOnly`.
-  - `getSession()` bridges Next.js `cookies()` store with `iron-session`.
+[Sessions: iron-session cookie]
+  └─ active-docs (current upload scope) cleared on full reload
+```
 
-- `src/server/ai.ts` — AI integration and fallbacks
-  - `ensureGenAI()` lazily initializes a client when `API_KEY` is provided.
-  - Local embedding fallback `localEmbed(text, dim=256)`: builds a fixed-size vector by iterating characters, updating a hash accumulator, incrementing bucket counts, then L2-normalizing the vector. Deterministic and offline.
-  - `embedText(input)`: uses Google `text-embedding-004` if available, else `localEmbed`.
-  - `generateText(prompt)`: calls `gemini-1.5-flash` for responses; throws if no `API_KEY`.
-  - `generateJSON<T>(systemPrompt)`: asks the model to return ONLY JSON; extracts fenced code blocks if present and `JSON.parse` them into typed output.
+Why this design:
+- Simple local dev: no external DB/vector service required.
+- Embedding fallback keeps ingestion/search usable when offline.
+- Next.js App Router co‑locates APIs and pages; easy to deploy as a single app.
 
-- `src/server/rag.ts` — chunking, embeddings, and ranking utilities
-  - `chunkText(text, chunkSize=800, overlap=150)`: word-based sliding window producing overlapping chunks to preserve context across boundaries.
-  - `embedChunks(chunks)`: sequentially embeds each chunk (could be parallelized in future).
-  - `topKSimilar(queryEmbedding, candidates, k)`: cosine similarity (via `cosine-similarity`), sort, slice top-k.
+---
 
-- `src/app/api/upload/route.ts` — ingestion pipeline
-  - Auth required (via `getSession()`). Accepts 1–3 files in `FormData` key `files`.
-  - Extraction:
-    - PDF: dynamic import of `pdf-parse` (with compatibility path) → `parsed.text`.
-    - DOCX: `mammoth.extractRawText` → `value`.
-    - TXT: `Buffer.toString("utf8")`.
-  - For each file: insert into `documents`, then `chunkText()` → `embedText()` per chunk → insert into `chunks` with `embedding` serialized to JSON string.
+## Technology stack and rationale
 
-- `src/app/api/chat/route.ts` — retrieval and answer generation
-  - Auth required. Validate `{ message }` with `zod`.
-  - Compute query embedding, load all user chunks with `SELECT id, content, embedding ...`.
-  - Compute cosine similarity via a dedicated function:
-    ```ts
-    function similarity(a: number[], b: number[]): number {
-      let dot = 0, na = 0, nb = 0;
-      for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; }
-      for (let i = 0; i < b.length; i++) nb += b[i]*b[i];
-      return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-8);
-    }
-    ```
-  - Rank and take top 8 chunks. Build a strict, grounded prompt:
-    - “Answer using ONLY the provided context. If not enough, say you are not sure.”
-  - Call `generateText(prompt)` and return `{ answer, sources }`.
+- Next.js 15 (App Router, TypeScript)
+  - Why: modern file‑based routing for pages and API routes, middleware for auth gates, great DX with Turbopack.
+- React 19
+  - Why: latest React features and compatibility with Next 15; simple state for chat UI.
+- Tailwind CSS v4, Framer Motion, `lucide-react`/`react-icons`
+  - Why: build a modern, responsive UI quickly; pair with subtle motion to make study UX feel alive.
+- `iron-session`
+  - Why: stateless, signed, HTTP‑only cookie sessions; no DB session table required.
+- SQLite + `better-sqlite3`
+  - Why: zero‑config DB with strong local performance; WAL mode for durability; great for single‑user/student use case.
+- `zod`
+  - Why: input validation on server; reduce malformed payloads.
+- AI via `@google/generative-ai`
+  - Why: Gemini models offer fast text generation and an embeddings model. Unified client. Local fallback for embeddings guarantees minimal offline capability.
+- Parsing via `pdf-parse` and `mammoth`
+  - Why: robust text extraction from PDFs and DOCX; TXT handled natively.
+- Utilities: `uuid`, `bcryptjs`, `cosine-similarity`, ESLint 9, TypeScript 5
+  - Why: IDs, password hashing, ranking, and developer ergonomics.
 
-- `src/app/api/test/route.ts` — test generation and scoring
-  - `POST`: Validate `{ mode, durationSec, numQuestions }`. Sample up to 200 chunk contents, prompt LLM to output `questions[]` JSON (MCQ/short/long) using `generateJSON`.
-  - Store `tests` and `test_questions` (options and answerKey serialized as needed), return `testId`.
-  - `PUT`: Validate `{ testId, answers }`. Load questions; score:
-    - MCQ: case-insensitive exact match against `answerKey`.
-    - Short: strict exact match (case-insensitive); could be expanded to fuzzy.
-    - Long: placeholder `0` (future LLM-grading planned).
-  - Persist `test_submissions` and `test_answers`, return `{ submissionId, score, maxScore }`.
+Note: `langchain` packages are installed but not wired into the main flows; I kept the app lean with direct SDK usage for clarity and control.
 
-- `src/middleware.ts` — route protection
-  - Redirect unauthenticated users away from `/dashboard`, `/chat`, `/test`.
-  - Redirect authenticated users away from `/login`, `/signup`.
+---
 
-- Frontend pages and components
-  - `(auth)/login`, `(auth)/signup`: simple client forms posting to API; on success, route to `/dashboard`.
-  - `dashboard/page.tsx`: menu cards to modes; file input hidden behind a button; uploads to `/api/upload`.
-  - `chat/page.tsx` + `components/AIChatCard.tsx`: conversational UI with typing indicator, sends to `/api/chat`.
-  - `test/page.tsx`: starts a test by mode, fetches `test-questions`, collects answers, and submits.
+## Data model (SQLite) and reasoning
 
-### Notable design choices
-- Embedding fallback keeps upload/index/search usable without network, improving local utility.
-- Storing embeddings as JSON in SQLite simplifies setup; a vector DB could be integrated later.
-- Strict grounding in prompts reduces hallucinations by instructing the model to abstain when context is insufficient.
+Implemented in `src/server/db.ts`. Tables:
+- users(id, email, passwordHash, createdAt)
+- documents(id, userId, name, mime, createdAt)
+- chunks(id, documentId, content, embedding)
+  - embedding is stored as a JSON‑stringified number[]; trade‑off: simple to bootstrap, not as fast as a vector DB.
+- tests, test_questions, test_submissions, test_answers
+  - persistent record of generated tests and user submissions.
+- chats, messages (reserved for future chat history)
 
-### Frontend Features
-- `Home (/)` Landing with animated hero.
-- `Login` / `Signup` client pages with form submission to auth APIs.
-- `Dashboard` shows an animated menu (Chat, MCQ/SA/LA test modes) and file upload control.
-- `Chat` page renders an interactive chat card with typing indicator; messages are sent to `/api/chat`.
-- `Test` page starts a test by mode, renders fetched questions, collects answers, and submits for scoring.
+Why SQLite:
+- No ops overhead, good enough performance for thousands of chunks.
+- The entire app remains self‑contained; great for students running locally.
 
-Key components:
-- `AIChatCard` — interactive chat UI with send/typing states.
-- `BackgroundCircles`, `GlowingEffect`, `GradientMenu`, `Glass` — visual polish.
+---
 
-### Configuration & Setup
-Environment variables:
-- `API_KEY` — Google Generative AI key. Required for AI generation. If missing, embeddings fall back locally; text generation endpoints will error.
-- `SESSION_SECRET` — secret for `iron-session`. Use a strong value in production.
-- `SQLITE_PATH` — optional path for the SQLite file (defaults to `./data.sqlite`).
+## Authentication, authorization, and middleware
 
-Install & run:
-```bash
+- `iron-session` stores `userId` in a signed, HTTP‑only cookie `study_assistant_session`.
+- Current mode: public by default. If no session exists, the server assigns `userId = "public"` so the app works without login.
+- Middleware (`src/middleware.ts`) is a no‑op at present; it does not guard routes.
+- Security flags: `SameSite=Lax`, `secure` in production, `httpOnly`.
+
+Why sessions (vs JWT): simplicity and fewer moving parts. Auth endpoints exist, but the app runs fine without logging in.
+
+---
+
+## RAG pipeline in depth (my core contribution)
+
+1) Ingestion and chunking
+- Uploads handled in `POST /api/upload` using `request.formData()` (no Multer needed in Next 15 runtime).
+- Extraction:
+  - PDF → `pdf-parse` (compat path `pdf-parse/lib/pdf-parse.js` to work across envs).
+  - DOCX → `mammoth.extractRawText`.
+  - TXT → direct `utf8` decode.
+- Chunking (`chunkText`): word‑based sliding window with overlap to preserve context across boundaries. Defaults: size≈800 words, overlap≈150.
+
+Why word‑based chunks: tokenizers vary; words are a stable proxy. Overlap keeps references intact when content bridges chunk edges.
+
+2) Embeddings
+- Primary: Gemini `text-embedding-004`.
+- Fallback: `localEmbed` — deterministic character‑hash bucketing into a 256‑dimensional vector normalized to unit length. This keeps retrieval usable offline and avoids hard failure for uploads.
+
+Trade‑offs: Local vectors are cruder than model embeddings but sufficient for short‑range lexical retrieval on small corpora.
+
+3) Storage
+- Each chunk is inserted into `chunks(content, embedding)`; embeddings stored as JSON string.
+
+4) Retrieval
+- Query message → embed (same function as chunks).
+- Load user’s chunks → compute cosine similarity → sort → take top 8.
+
+5) Grounded prompting and generation
+- Prompt pattern: “Answer using ONLY the provided context. If not enough, say you are not sure.”
+- Model: `gemini-1.5-flash` for fast iteration.
+- Returns: `{ answer, sources: [chunkIds...] }`.
+
+Safety against hallucination: strict instruction + abstain clause. Future: cite highlighted excerpts inline.
+
+Edge cases I handled:
+- Missing API key → generation endpoints throw clear errors; ingestion still works with local embeddings.
+- Empty/low‑text files return early with user‑friendly messages.
+- Chunking handles short docs without creating zero‑length segments.
+
+---
+
+## Frontend implementation (my core contribution)
+
+Pages and UX:
+- `app/page.tsx` → animated landing.
+- `(auth)/login` and `(auth)/signup` → simple forms posting to `/api/auth/*`.
+- `dashboard/page.tsx` → action cards + upload control (hidden input + styled button) posting to `/api/upload`. Navigation buttons (Chat/MCQ/SA/LA) are gated: if no file is uploaded, navigation is blocked and a toast is shown on the Dashboard.
+- `chat/page.tsx` with `components/AIChatCard.tsx` → chat interface.
+- `test/page.tsx` → start test, fetch questions, collect answers, submit.
+
+Chat UI details (`AIChatCard`):
+- Local state for messages and typing indicator.
+- Send on Enter/click → POST `/api/chat` → push AI response to the feed.
+- Subtle motion with Framer Motion; responsive Tailwind classes; accessible color contrast for dark theme.
+
+Why a custom chat component (vs a library): full control over states, styling, and future streaming.
+
+Background animation:
+- `components/BackgroundPaths.tsx` provides `BackgroundPathsOverlay`, now fixed to the viewport for a full‑screen effect across Chat and Test pages.
+- Ensures the animation isn’t confined to a smaller container.
+
+Accessibility and usability:
+- Keyboard submit, visible focus states, readable sizes.
+- Network errors surface a friendly message and don’t break the session.
+
+---
+
+## API surface (what/why/how)
+
+Auth:
+- POST `/api/auth/signup` — create user, hash with `bcryptjs`, start session.
+- POST `/api/auth/login` — verify credentials, start session.
+- POST `/api/auth/logout` — destroy session.
+- GET `/api/auth/me` — return `{ user }` or `{ user: null }`.
+
+Documents & RAG:
+- POST `/api/upload` — accepts 1–3 files, extracts text, chunks, embeds, persists.
+- POST `/api/chat` — embeds query, ranks top chunks, constructs grounded prompt, returns AI answer.
+
+Testing:
+- POST `/api/test` — generate test JSON via model and persist.
+- GET `/api/test-questions?testId=...` — fetch stored questions for the test run.
+- PUT `/api/test` — submit answers; auto‑score MCQ/Short; Long is placeholder.
+
+Why JSON questions: deterministic client rendering and future analytics on question difficulty.
+
+Session & state:
+- GET `/api/state/active-docs` — `{ hasActiveDocs: boolean }` used to gate navigation and actions.
+- DELETE `/api/state/active-docs` — clears current active document IDs; invoked automatically on full page reload for a fresh session.
+
+---
+
+## Performance considerations
+
+- Chunk size and overlap tuned for small study corpora; reduces prompt size while retaining context.
+- Embeddings are computed sequentially; parallelization could speed large uploads.
+- SQLite with WAL is fast for local workloads; consider indexes on `documents.userId` and `chunks.documentId` for scale.
+- Prompt is non‑streaming to keep server logic simple; streaming could improve UX on long answers.
+- Test generation now supports a local MCQ fallback, avoiding hard failures when model calls are slow/unavailable.
+
+---
+
+## Security, privacy, and safety
+
+- Passwords hashed with `bcryptjs`.
+- Sessions are HTTP‑only, `SameSite=Lax`, `secure` in prod.
+- Server input validated with `zod`.
+- File parsing only for PDF/DOCX/TXT; rejects others, limiting attack surface.
+- Data stays local in SQLite; the only external calls are to Gemini when an API key is configured. Test generation has a local fallback for MCQ/Short/Long to preserve functionality when the model is unavailable.
+- Missing features to add later: rate limiting, file type allow‑list tightening, content moderation for prompts.
+
+---
+
+## Testing and validation
+
+Current state:
+- Manual end‑to‑end testing of auth, upload, chat, and test workflows.
+- Deterministic local embeddings help validate ranking without needing the network.
+
+Planned additions:
+- Unit tests for `chunkText`, similarity, and test scoring.
+- Integration tests for `/api/upload` and `/api/chat` with small fixtures.
+- Snapshot tests for prompt templates.
+
+---
+
+## Developer setup (Windows/PowerShell)
+
+Environment variables (create a `.env.local`):
+- `API_KEY` — Google Generative AI key. Required for chat and test generation.
+- `SESSION_SECRET` — strong random string for sessions.
+- `SQLITE_PATH` — optional path; defaults to `./data.sqlite`.
+
+Install and run locally:
+
+```powershell
 npm install
 npm run dev
 # open http://localhost:3000
 ```
 
-Production build:
-```bash
+Production build (optional):
+
+```powershell
 npm run build
 npm start
 ```
 
-### Work done so far
-- Account system (signup/login/logout, session cookies, protected routes)
-- Document ingestion pipeline (PDF/DOCX/TXT → text → chunk → embed → store)
-- RAG chat over user-specific knowledge base (top-k cosine similarity)
-- Test generation (MCQ/short/long) and storage; question fetch and submission UI
-- Scoring (MCQ exact match, short exact match, long answer placeholder)
-- Modern animated UI and navigation
+---
 
-### Known errors and troubleshooting
-- Missing `API_KEY`:
-  - Embedding: falls back to a deterministic local embedding; chat still requires generation and will fail without an API key.
-  - Generation routes (`/api/chat`, `/api/test` for JSON generation) will return errors like "Missing API_KEY for text/JSON generation".
-  - Fix: set `API_KEY` in environment.
+## How to use (quick start)
 
-- PDF parsing edge cases:
-  - Some PDFs fail to parse or produce empty text. The upload route returns a 400 with a file-specific message.
-  - Fix: try re-exporting the PDF as text-based or upload as TXT/DOCX.
+1) Sign up (email + password) → redirected to Dashboard.
+2) Upload 1–3 files (PDF/DOCX/TXT). Wait for processing to complete.
+3) Use the Dashboard buttons to go to Chat/Test. If no file is uploaded, navigation is blocked and a toast appears on the Dashboard.
+4) Go to Chat → ask questions grounded in your notes.
+5) Go to Test → choose mode (MCQ/Short/Long), generate questions, answer, and submit for a score.
+Note: After a full browser refresh, the session is reset for safety; upload again to start a new session.
 
-- DOCX parsing quirks:
-  - `mammoth` extracts raw text; complex layouts may lose structure.
-
-- "No documents uploaded" when starting a test:
-  - The test route requires at least one uploaded document.
-
-- Session issues in production:
-  - Ensure `SESSION_SECRET` is set and `cookieOptions.secure` is true (it is when `NODE_ENV=production`).
-
-### Limitations and future work
-- Chat history storage: Tables exist but are not yet wired to persist conversation turns.
-- Long-answer grading: Currently a placeholder (awarded 0). Could be LLM-graded with rubrics and similarity checks.
-- Source highlighting: UI receives chunk IDs but does not yet surface excerpts with citations.
-- Reranking: Only cosine similarity over stored embeddings; could add hybrid search (BM25) or multi-vector retrieval.
-- Streaming responses: Current chat returns full responses; streaming would improve UX.
-- File limits: 1–3 files per upload, basic type checks; could add queueing and progress UI.
-- Role-based features: All users have same permissions; could add roles or sharing.
-
-### Security and privacy
-- Passwords hashed with bcrypt.
-- Session cookie is HTTP-only, `SameSite=Lax`, and `secure` in production.
-- All personal data is stored locally in SQLite; no remote storage beyond optional calls to Google Generative AI for generation/embedding.
-- Input validation via `zod` on server routes.
-
-### Directory guide (high level)
-- `src/app` — App Router pages and API routes
-  - `(auth)/*` — login/signup pages
-  - `/dashboard`, `/chat`, `/test` — main features
-  - `/api/*` — auth, upload, chat, test endpoints
-- `src/server` — server utilities (`db.ts`, `session.ts`, `ai.ts`, `rag.ts`)
-- `src/components` — UI components and effects
-- `src/lib/utils.ts` — small client helpers
-- `data.sqlite` — SQLite database (WAL mode enabled)
-
-### Request lifecycles (reference)
-- Upload
-  1. Client (Dashboard) → `POST /api/upload` (FormData: files)
-  2. Server extracts text → chunk → embed → DB inserts
-
-- Chat
-  1. Client (Chat) → `POST /api/chat` ({ message })
-  2. Server embeds query → ranks top chunks → crafts prompt → LLM → answer
-
-- Test
-  1. Client (Test) → `POST /api/test`
-  2. Server samples content → JSON questions via LLM → store → return `testId`
-  3. Client fetches `GET /api/test-questions?testId=...`
-  4. Client submits answers → `PUT /api/test` → returns score
+Tip: Without `API_KEY`, uploads and retrieval work (local embeddings). Chat/Test attempt model calls; if they fail, generation falls back (MCQ/Short/Long) so you can continue practicing.
 
 ---
-This document is intended to be a single-stop technical reference for contributors and users who want to understand, run, and extend Study Assistant.
+
+## Troubleshooting
+
+- “Missing API_KEY for text/JSON generation”
+  - Set `API_KEY` in your environment. Embeddings still work locally. If model calls fail, tests fall back to local generation (MCQ/Short/Long); chat falls back to a concise extract when possible.
+- “Failed to parse PDF”
+  - Re‑export your PDF as text‑based or upload as DOCX/TXT.
+- “Upload 1–3 files”
+  - The endpoint currently enforces a small batch to keep processing times predictable.
+- Empty answers or strange retrieval
+  - Ensure your files contain selectable text (not scanned images), or try TXT.
+ - “Dashboard buttons do nothing”
+   - If no file is uploaded, navigation is intentionally blocked and a toast is shown on the Dashboard. Upload a file first.
+ - “Uploads disappeared after refresh”
+   - On a full browser reload, the session clears the active document scope by design; upload again to start a fresh session.
+
+---
+
+## Limitations and roadmap
+
+- No chat history yet (tables exist but not wired).
+- Long answer grading is a placeholder (0 points); plan: LLM‑assisted rubric scoring.
+- No citations UI yet; plan: show highlighted excerpts and per‑message sources.
+- Retrieval is pure cosine over embeddings; plan: add hybrid search (BM25 + vectors) and reranking.
+- Non‑streaming chat; plan: server‑sent events or chunked streaming for better UX.
+- Performance: batch/parallel embed, background indexing, and DB indexes.
+- Security: add rate limiting and stricter file validation.
+
+---
+
+## Personal contributions, trade‑offs, and learnings
+
+My scope: frontend UX and the full RAG pipeline (ingestion → chunking → embedding → retrieval → prompting → response), and close collaboration on API design.
+
+Key decisions I made:
+- Use Tailwind v4 + Framer Motion to quickly craft a clean, responsive interface.
+- Build a small custom chat component for full control and future streaming support.
+- Keep embeddings local‑fallback to avoid blocking uploads when offline; document the trade‑off clearly.
+- Store vectors as JSON in SQLite to minimize external dependencies and keep onboarding simple.
+
+What I learned:
+- How chunk size/overlap drastically affect retrieval quality and prompt budget.
+- The value of explicit “answer only from context” prompts for reducing hallucinations.
+- That parsed PDFs can be noisy; cleaning and sampling text improves test question quality.
+
+---
+
+## Appendix A — Key prompts
+
+Chat prompt (simplified):
+> “You are a helpful study assistant. Answer the user's question using ONLY the provided context. If the context is not enough, say you are not sure.”
+
+Test generation (JSON‑only):
+> “Given these materials, produce ONLY valid JSON with an array of questions (MCQ/Short/Long) with options/answer keys as appropriate.”
+
+---
+
+## Appendix B — Important files
+
+- `src/app/api/upload/route.ts` — parsing, chunking, embedding, persistence.
+- `src/app/api/chat/route.ts` — query embedding, ranking, prompting.
+- `src/app/api/state/active-docs/route.ts` — GET hasActiveDocs; DELETE clears current active docs on demand.
+- `src/server/ai.ts` — Gemini integration + local embedding fallback.
+- `src/server/rag.ts` — chunking and ranking utilities.
+- `src/server/db.ts` — schema and DB lifecycle.
+- `src/middleware.ts` — route protection.
+- `src/components/AIChatCard.tsx` — chat UI.
+- `src/components/BackgroundPaths.tsx` — full‑screen animated background overlay.
+- `src/components/SessionFreshReset.tsx` — clears active docs only on full page reload.
+
+---
+
+## Quality gates (current change)
+
+- Build: Not executed in this report.
+- Lint/Typecheck: PASS for modified files.
+- Tests: N/A (manual flows verified; future automated tests planned).
+
+---
+
+This report documents what the project is, why each choice was made, and how it works end‑to‑end, with a focus on the frontend and RAG components I implemented.
+
+---
+
+## Deep technical appendix
+
+### A. Detailed API contracts (schemas, responses, errors)
+
+Notes:
+- All endpoints return JSON.
+- Auth-required endpoints return 401 when no valid `iron-session` cookie is present.
+
+1) POST `/api/auth/signup`
+- Request body (Zod):
+  - `{ email: string (email), password: string (min 6) }`
+- Success 200:
+  - `{ id: string, email: string }` and sets `study_assistant_session` cookie
+- Errors:
+  - 400 `{ error: "Invalid input" }`
+  - 409 `{ error: "Email already in use" }`
+
+2) POST `/api/auth/login`
+- Request body (Zod): same as signup
+- Success 200:
+  - `{ id: string, email: string }` and sets session cookie
+- Errors:
+  - 400 `{ error: "Invalid input" }`
+  - 401 `{ error: "Invalid credentials" }`
+
+3) POST `/api/auth/logout`
+- Success 200: `{ ok: true }` and destroys session
+
+4) GET `/api/auth/me`
+- Success 200:
+  - `{ user: { id: string, email: string, createdAt: string } | null }`
+
+5) POST `/api/upload` (multipart)
+- FormData: `files` (1–3 files; allowed: .pdf, .docx, .txt)
+- Success 200: `{ ok: true }`
+- Errors:
+  - 400 `{ error: "Upload 1-3 files" }`
+  - 400 `{ error: "Failed to parse PDF: <name>" }`
+  - 401 `{ error: "Unauthorized" }`
+  - 500 `{ error: "<message>" }`
+
+6) POST `/api/chat`
+- Request body (Zod): `{ message: string (min 1) }`
+- Success 200: `{ answer: string, sources: string[] /*chunk IDs*/ }`
+- Errors:
+  - 400 `{ error: "Invalid input" }`
+  - 401 `{ error: "Unauthorized" }`
+  - 500 `{ error: "Missing API_KEY for text generation" | other }`
+
+7) POST `/api/test`
+- Request body (Zod): `{ mode: "mcq"|"short"|"long"|"mixed", durationSec: number, numQuestions: number }`
+- Success 200: `{ testId: string }`
+- Errors:
+  - 400 `{ error: "Invalid input" }`
+  - 400 `{ error: "No documents uploaded" }` (if applicable)
+  - 401 `{ error: "Unauthorized" }`
+  - 500 `{ error: "Missing API_KEY for JSON generation" | other }`
+
+8) GET `/api/test-questions?testId=<id>`
+- Success 200: `{ testId: string, questions: Array<{ id: string, type: "mcq"|"short"|"long", question: string, options?: string[], answerKey?: string, maxScore: number }> }`
+- Errors: 400 invalid/missing testId, 401 unauthorized
+
+9) PUT `/api/test`
+- Request body: `{ testId: string, answers: Array<{ questionId: string, answer: string }> }`
+- Success 200: `{ submissionId: string, score: number, maxScore: number }`
+- Errors: 400 invalid input, 401 unauthorized
+
+---
+
+### B. Database schema (annotated DDL) and indexing recommendations
+
+Current DDL (simplified from `src/server/db.ts`):
+
+```sql
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  passwordHash TEXT NOT NULL,
+  createdAt TEXT NOT NULL
+);
+
+CREATE TABLE documents (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL,
+  name TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  FOREIGN KEY(userId) REFERENCES users(id)
+);
+
+CREATE TABLE chunks (
+  id TEXT PRIMARY KEY,
+  documentId TEXT NOT NULL,
+  content TEXT NOT NULL,
+  embedding TEXT NOT NULL,
+  FOREIGN KEY(documentId) REFERENCES documents(id)
+);
+
+CREATE TABLE tests (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  durationSec INTEGER NOT NULL,
+  createdAt TEXT NOT NULL,
+  FOREIGN KEY(userId) REFERENCES users(id)
+);
+
+CREATE TABLE test_questions (
+  id TEXT PRIMARY KEY,
+  testId TEXT NOT NULL,
+  type TEXT NOT NULL,
+  question TEXT NOT NULL,
+  options TEXT,
+  answerKey TEXT,
+  maxScore REAL NOT NULL,
+  FOREIGN KEY(testId) REFERENCES tests(id)
+);
+
+CREATE TABLE test_submissions (
+  id TEXT PRIMARY KEY,
+  testId TEXT NOT NULL,
+  userId TEXT NOT NULL,
+  startedAt TEXT NOT NULL,
+  submittedAt TEXT,
+  score REAL,
+  FOREIGN KEY(testId) REFERENCES tests(id),
+  FOREIGN KEY(userId) REFERENCES users(id)
+);
+
+CREATE TABLE test_answers (
+  id TEXT PRIMARY KEY,
+  submissionId TEXT NOT NULL,
+  questionId TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  scoreAwarded REAL,
+  FOREIGN KEY(submissionId) REFERENCES test_submissions(id),
+  FOREIGN KEY(questionId) REFERENCES test_questions(id)
+);
+```
+
+Recommended indexes for scale:
+- `CREATE INDEX idx_documents_user ON documents(userId);`
+- `CREATE INDEX idx_chunks_doc ON chunks(documentId);`
+- `CREATE INDEX idx_tests_user ON tests(userId);`
+- `CREATE INDEX idx_questions_test ON test_questions(testId);`
+- `CREATE INDEX idx_submissions_test_user ON test_submissions(testId, userId);`
+
+Note: embeddings are stored as JSON strings; for heavy workloads consider a vector DB (e.g., SQLite extensions like `vss` or external services) or store embeddings in compressed binary.
+
+---
+
+### C. RAG math and heuristics
+
+Embedding normalization:
+- Gemini embeddings are already in a vector space suitable for cosine similarity.
+- Local fallback embeds into a fixed dimension d=256 by character hashing + bucket counts, then L2‑normalizes: $\hat{v} = v / \|v\|_2$.
+
+Cosine similarity:
+$$\text{cos}(a,b) = \frac{\sum_i a_i b_i}{\sqrt{\sum_i a_i^2} \cdot \sqrt{\sum_i b_i^2} + 10^{-8}}$$
+The small epsilon stabilizes division when norms are near zero.
+
+Chunking heuristics:
+- Window size ~800 words, overlap ~150 words.
+- Rationale: maintain semantic continuity across chunk boundaries without exploding storage; good balance for typical lecture notes and textbooks.
+
+Top‑K selection:
+- K=8 for response context. This caps prompt size and improves latency while preserving breadth.
+
+Potential improvements:
+- Hybrid retrieval (BM25 + vectors), MMR reranking, or cross‑encoder reranking for better precision at K.
+
+---
+
+### D. Prompt templates (full examples)
+
+Chat (grounded):
+
+```
+You are a helpful study assistant. Answer the user's question using ONLY the provided context. 
+If the context is not enough, say you are not sure.
+
+Context:
+<top-8 chunk texts delimited with --->
+
+User: <message>
+Assistant:
+```
+
+Test generation (JSON only, robust to markdown code fences in responses):
+
+```
+You are a question generator. Using the material below, return ONLY valid JSON describing an array of questions.
+Each question is one of: "mcq" | "short" | "long". MCQ must include options and an answerKey.
+
+JSON shape:
+{
+  "questions": [
+    {
+      "type": "mcq" | "short" | "long",
+      "question": string,
+      "options": string[]?,
+      "answerKey": string?,
+      "maxScore": number
+    }, ...
+  ]
+}
+
+Return ONLY JSON, no prose.
+```
+
+Parsing is resilient: the server extracts fenced ```json blocks if present; else attempts to parse the raw body as JSON.
+
+---
+
+### E. Frontend architecture details
+
+Component map (high‑level):
+- `app/layout.tsx` — global shell (nav, fonts, container) + `globals.css`.
+- `app/page.tsx` — landing with `HeroGeometric`.
+- `(auth)/login/page.tsx`, `(auth)/signup/page.tsx` — forms that POST to auth APIs.
+- `dashboard/page.tsx` — actions (Chat/Test) and upload control.
+- `chat/page.tsx` — wraps `AIChatCard`.
+- `components/AIChatCard.tsx` — chat UI: message list, input, send/typing state.
+
+State flows:
+- Chat messages: local component state; fetch on send, append assistant response.
+- Auth gate: on mount, fetch `/api/auth/me`; redirect to `/login` if no user.
+
+Styling and motion:
+- Tailwind utility classes for layout, spacing, and theming.
+- Framer Motion for enter/fade and subtle background animation.
+
+Accessibility:
+- Keyboard submit via Enter.
+- Visible focus rings and readable contrast on dark background.
+- Errors rendered as inline assistant messages to keep context.
+
+---
+
+### F. Configuration matrix
+
+Environment variables:
+- `API_KEY` — required for text and JSON generation (chat, test). If missing, embeddings fallback to local, but generation endpoints error.
+- `SESSION_SECRET` — strong secret string for signing cookies.
+- `SQLITE_PATH` — optional custom path (default `./data.sqlite`).
+
+Runtime notes:
+- `export const runtime = "nodejs"` in `upload` route ensures Node APIs are available for PDF/DOCX parsing.
+- Other routes can run in the default runtime; PDF parsing specifically needs Node.
+
+---
+
+### G. Security and threat model (expanded)
+
+Threats considered and mitigations:
+- Credential theft → bcrypt password hashing; never store plaintext.
+- Session theft → HTTP‑only, signed cookies; `secure` in production; `SameSite=Lax` to reduce CSRF.
+- CSRF on state‑changing routes → Lax cookies + app‑only usage reduces risk; optional CSRF token can be added later.
+- XSS → No server‑rendered untrusted HTML; chat output is plain text; avoid `dangerouslySetInnerHTML`.
+- File upload attacks → Only accept PDF/DOCX/TXT; parse via vetted libs; limit count (1–3 files).
+- Prompt injection → Strict instruction to answer only from provided context; still consider server‑side sanitation and source display.
+
+Additional hardening to consider:
+- Size limits on uploads; MIME and extension allow‑list enforcement.
+- Rate limiting on `/api/chat` and `/api/upload`.
+- Content scanning for risky files.
+
+---
+
+### H. Performance and scalability (expanded)
+
+Complexity:
+- Upload N files with M total words → chunking O(M), embedding O(C) where C=#chunks.
+- Retrieval: similarity O(K + Nchunks). Current loads all user chunks; for very large corpora, consider pre‑filtering or DB‑level paging.
+
+Latency tips:
+- Batch/parallel embeddings where API limits allow.
+- Cache query embeddings for repeated prompts during the same session.
+- Reduce K or chunk size if prompt tokens become large.
+
+Storage:
+- Rough order: each chunk stores text (~1–4KB) + JSON embedding (~1–2KB for 256 dims) → on the order of a few KB per chunk.
+
+---
+
+### I. Testing strategy (proposed specifics)
+
+Unit tests:
+- `chunkText` — boundaries, overlap correctness, short/empty inputs.
+- Similarity — known vectors produce expected ordering.
+- Scoring — MCQ exact match (case‑insensitive), Short exact match, Long=0.
+
+Integration tests:
+- `/api/upload` — small fixture files (TXT/PDF) create documents and chunks.
+- `/api/chat` — with local embeddings and a small corpus, answer includes expected source.
+
+Contract tests:
+- Validate `generateJSON` robust extraction from fenced code blocks and raw JSON.
+
+---
+
+### J. Deployment, operations, and observability
+
+Deployment options:
+- Self‑hosted Node.js (recommended for full PDF/DOCX parsing support).
+- Managed platforms supporting Node runtime; ensure the upload route runs in Node (not Edge) due to `pdf-parse`/`mammoth`.
+
+Operational considerations:
+- Persist `data.sqlite` and WAL files (`data.sqlite-wal`, `data.sqlite-shm`).
+- Backups: periodic copy of SQLite files when the service is stopped (or use `VACUUM INTO`).
+- Logs: add minimal request/error logging (e.g., `pino`) for debugging.
+
+Monitoring ideas:
+- Track upload counts, #chunks, average chat latency, topK sizes.
+- Error rate on PDF parsing and model calls.
+
+---
+
+### K. Alternatives considered
+
+- Auth: NextAuth vs `iron-session` → chose `iron-session` for simplicity and no DB tables.
+- DB: Postgres + pgvector vs SQLite → chose SQLite for zero‑ops local usage.
+- Vector store: external vs JSON in SQLite → started with JSON to minimize dependencies; can upgrade later.
+- LLM provider: kept to Gemini SDK; LangChain unused to reduce abstraction overhead.
+
+---
+
+### L. Data governance
+
+- Export: implement endpoint to export a user’s documents, chunks, and tests as JSON.
+- Delete: endpoint to delete user data (documents + chunks + tests) and account.
+- Privacy: by default, all data local; LLM calls only when `API_KEY` is set.
+
+---
+
+### M. Roadmap checklist (granular)
+
+- [ ] Add DB indexes listed above.
+- [ ] Persist chat history (reuse `chats`/`messages` tables).
+- [ ] Citations UI with highlighted excerpts and source list.
+- [ ] Streaming chat responses.
+- [ ] Hybrid retrieval (BM25 + vectors) and reranking.
+- [ ] Fuzzy short‑answer scoring (normalize, stem, synonyms).
+- [ ] Rate limiting and upload size limits.
+- [ ] Unit/integration test suite with fixtures.
+- [ ] Data export/delete endpoints.
+
+---
+
+### N. Glossary
+
+- RAG — Retrieval‑Augmented Generation: retrieve relevant passages, feed to an LLM to ground responses.
+- Embedding — numeric vector representation of text for similarity search.
+- Cosine similarity — metric for measuring angle (similarity) between vectors.
+- Chunk — a segment of source text produced by a sliding window.
+
 
 

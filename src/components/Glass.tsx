@@ -92,5 +92,3 @@ export const GlassFilter: React.FC = () => (
     </filter>
   </svg>
 );
-
-
