@@ -11,6 +11,7 @@ function ensureGenAI(): GoogleGenerativeAI | null {
 	return genAI;
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 function localEmbed(input: string, dim = 256): number[] {
 	const vec = new Array(dim).fill(0);
 	let hash = 2166136261;
@@ -21,7 +22,7 @@ function localEmbed(input: string, dim = 256): number[] {
 		const idx = Math.abs(hash) % dim;
 		vec[idx] += 1;
 	}
-	let norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;
+	const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;
 	return vec.map(v => v / norm);
 }
 
