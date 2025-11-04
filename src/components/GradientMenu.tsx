@@ -18,12 +18,12 @@ export default function GradientMenu({ items }: { items: MenuItem[] }) {
         {items.map(({ title, icon, gradientFrom, gradientTo, onClick, disabled }, idx) => (
           <li
             key={idx}
-            style={{
-              // @ts-expect-error CSS var for tailwind arbitrary value
-              "--gradient-from": gradientFrom,
-              // @ts-expect-error CSS var for tailwind arbitrary value
-              "--gradient-to": gradientTo,
-            }}
+            style={
+              ({
+                "--gradient-from": gradientFrom,
+                "--gradient-to": gradientTo,
+              } as React.CSSProperties)
+            }
             className={`relative w-[60px] h-[60px] bg-white/90 shadow-lg rounded-full flex items-center justify-center transition-all duration-500 hover:w-[180px] hover:shadow-none group cursor-pointer ${disabled ? "opacity-60 pointer-events-none" : ""}`}
             onClick={disabled ? undefined : onClick}
             aria-disabled={disabled}
