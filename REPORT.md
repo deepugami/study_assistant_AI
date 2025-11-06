@@ -738,3 +738,205 @@ Monitoring ideas:
 
 
 
+---
+
+## Appendix O — Libraries and animations used (names, links, how to get)
+
+This section lists every notable library and the custom animation components used in the app, with quick links and how to install them.
+
+### Core framework
+
+- Next.js
+  - Package: `next`
+  - Link: https://nextjs.org/ • https://www.npmjs.com/package/next
+  - Install: `npm i next react react-dom`
+
+- React
+  - Packages: `react`, `react-dom`
+  - Link: https://react.dev • https://www.npmjs.com/package/react
+  - Install: `npm i react react-dom`
+
+### Styling and motion
+
+- Tailwind CSS v4
+  - Package: `tailwindcss` (and `@tailwindcss/postcss` for PostCSS integration)
+  - Link: https://tailwindcss.com • https://www.npmjs.com/package/tailwindcss
+  - Install: `npm i -D tailwindcss @tailwindcss/postcss`
+
+- Framer Motion (for animations)
+  - Package: `framer-motion`
+  - Link: https://www.framer.com/motion/ • https://www.npmjs.com/package/framer-motion
+  - Install: `npm i framer-motion`
+
+- Utility classnames
+  - Package: `clsx`
+  - Link: https://www.npmjs.com/package/clsx
+  - Install: `npm i clsx`
+
+### Icons
+
+- Lucide Icons (React)
+  - Package: `lucide-react`
+  - Link: https://lucide.dev • https://www.npmjs.com/package/lucide-react
+  - Install: `npm i lucide-react`
+
+- React Icons
+  - Package: `react-icons`
+  - Link: https://react-icons.github.io/react-icons • https://www.npmjs.com/package/react-icons
+  - Install: `npm i react-icons`
+
+### Authentication and sessions
+
+- iron-session
+  - Package: `iron-session`
+  - Link: https://github.com/vvo/iron-session • https://www.npmjs.com/package/iron-session
+  - Install: `npm i iron-session`
+
+- Password hashing
+  - Package: `bcryptjs`
+  - Link: https://www.npmjs.com/package/bcryptjs
+  - Install: `npm i bcryptjs`
+
+### Database and filesystem
+
+- SQLite bindings
+  - Package: `better-sqlite3`
+  - Link: https://github.com/WiseLibs/better-sqlite3 • https://www.npmjs.com/package/better-sqlite3
+  - Install: `npm i better-sqlite3`
+
+### File parsing (ingestion)
+
+- PDF parsing
+  - Package: `pdf-parse`
+  - Link: https://www.npmjs.com/package/pdf-parse
+  - Install: `npm i pdf-parse`
+
+- DOCX parsing
+  - Package: `mammoth`
+  - Link: https://www.npmjs.com/package/mammoth
+  - Install: `npm i mammoth`
+
+- Multipart form data (optional)
+  - Package: `multer`
+  - Link: https://www.npmjs.com/package/multer
+  - Install: `npm i multer`
+  - Note: The current Next 15 upload route uses `request.formData()` and doesn’t require Multer, but the package is present and can be used for Node runtime endpoints if desired.
+
+### Validation and types
+
+- Zod (schema validation)
+  - Package: `zod`
+  - Link: https://zod.dev • https://www.npmjs.com/package/zod
+  - Install: `npm i zod`
+
+- TypeScript
+  - Package: `typescript`
+  - Link: https://www.typescriptlang.org • https://www.npmjs.com/package/typescript
+  - Install: `npm i -D typescript`
+
+- ESLint 9 + Next.js config
+  - Packages: `eslint`, `eslint-config-next`, `@eslint/eslintrc`
+  - Link: https://eslint.org • https://www.npmjs.com/package/eslint-config-next
+  - Install: `npm i -D eslint eslint-config-next @eslint/eslintrc`
+
+- Type definitions
+  - Packages: `@types/node`, `@types/react`, `@types/react-dom`, `@types/better-sqlite3`, `@types/bcryptjs`, `@types/multer`
+  - Install: `npm i -D @types/node @types/react @types/react-dom @types/better-sqlite3 @types/bcryptjs @types/multer`
+
+### AI and RAG
+
+- Google Generative AI SDK (Gemini)
+  - Package: `@google/generative-ai`
+  - Link: https://ai.google.dev • https://www.npmjs.com/package/@google/generative-ai
+  - Install: `npm i @google/generative-ai`
+
+- LangChain (installed, currently not wired into main flows)
+  - Packages: `langchain`, `@langchain/community`, `@langchain/google-genai`
+  - Link: https://js.langchain.com • https://www.npmjs.com/package/langchain
+  - Install: `npm i langchain @langchain/community @langchain/google-genai`
+  - Note: These are optional; the app uses direct Gemini SDK calls to stay lean.
+
+### Utilities
+
+- UUIDs
+  - Package: `uuid`
+  - Link: https://www.npmjs.com/package/uuid
+  - Install: `npm i uuid`
+
+- Cosine similarity
+  - Implemented locally (no external package) in `src/server/rag.ts` and `src/app/api/chat/route.ts` to reduce dependency surface and ensure typed builds.
+
+### Custom animation components (in this repo)
+
+These are hand-rolled components using Tailwind and Framer Motion. You can obtain them by copying the files from this repository into your project and installing their peer dependencies (Tailwind, Framer Motion, React). All paths are under `src/components/`.
+
+- BackgroundPathsOverlay
+  - File: `src/components/BackgroundPaths.tsx`
+  - Uses: `framer-motion` animated SVG paths for a full-screen moving line background.
+  - Peer deps: `framer-motion`
+
+- BackgroundCircles
+  - File: `src/components/BackgroundCircles.tsx`
+  - Uses: layered rotating circles + animated grid via `framer-motion`.
+  - Peer deps: `framer-motion`, `clsx`
+
+- GlowingEffect
+  - File: `src/components/GlowingEffect.tsx`
+  - Uses: CSS conic gradients with mouse-follow glow, powered by `framer-motion`’s `animate` API.
+  - Peer deps: `framer-motion`
+
+- GooeyText
+  - File: `src/components/GooeyText.tsx`
+  - Uses: SVG filter and JavaScript morph loop to “gooey” morph between strings.
+  - Peer deps: none beyond React and Tailwind.
+
+- EvervaultCard
+  - File: `src/components/EvervaultCard.tsx`
+  - Uses: `framer-motion` MotionValues to create a masked radial hover spotlight with animated text.
+  - Peer deps: `framer-motion`
+
+- HeroGeometric
+  - File: `src/components/HeroGeometric.tsx`
+  - Uses: `framer-motion` to animate elegant gradient shapes and staged text fades.
+  - Peer deps: `framer-motion`, `lucide-react`
+
+How to obtain these animations from the internet:
+- Clone or download this repository: https://github.com/deepugami/study_assistant_AI
+- Copy the component files listed above into your own project.
+- Install required peer dependencies via npm (see each item above).
+- Alternatively, similar effects and patterns are documented on the Framer Motion site and community examples.
+
+### Quick install block (copy/paste)
+
+```bash
+# Core
+npm i next react react-dom
+
+# Styling/motion
+npm i framer-motion clsx
+npm i -D tailwindcss @tailwindcss/postcss
+
+# Icons
+npm i lucide-react react-icons
+
+# Auth & DB
+npm i iron-session bcryptjs better-sqlite3
+
+# Parsing
+npm i pdf-parse mammoth multer
+
+# Validation & utils
+npm i zod uuid
+
+# Types & lint (dev)
+npm i -D typescript eslint eslint-config-next @eslint/eslintrc @types/node @types/react @types/react-dom @types/better-sqlite3 @types/bcryptjs @types/multer
+
+# AI (optional: direct SDK)
+npm i @google/generative-ai
+
+# AI (optional: LangChain)
+npm i langchain @langchain/community @langchain/google-genai
+```
+
+
+
