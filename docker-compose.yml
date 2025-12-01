@@ -1,0 +1,21 @@
+services:
+  web:
+    build: .
+    image: study-assistant:latest
+    ports:
+      - "3000:3000"
+    environment:
+      # Set your Google API key if you plan to use remote AI
+      - API_KEY=${API_KEY}
+      # Optional overrides
+      - AI_TEXT_MODEL=${AI_TEXT_MODEL}
+      - AI_EMBED_MODEL=${AI_EMBED_MODEL}
+      - AI_EMBED_LOCAL=${AI_EMBED_LOCAL}
+      - SQLITE_PATH=/app/data/data.sqlite
+    volumes:
+      - app_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  app_data:
+    driver: local
