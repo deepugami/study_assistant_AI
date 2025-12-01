@@ -8,7 +8,9 @@ export default function InterviewPage() {
   const [status, setStatus] = useState("Idle");
   const [lastUser, setLastUser] = useState("");
   const [lastAssistant, setLastAssistant] = useState("");
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // Local fallback type to satisfy server-side type checking
+  type LocalSpeechRecognition = any;
+  const recognitionRef = useRef<LocalSpeechRecognition | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -32,11 +34,11 @@ export default function InterviewPage() {
     })();
   }, []);
 
-  function ensureRecognition(): SpeechRecognition | null {
+  function ensureRecognition(): LocalSpeechRecognition | null {
     try {
-      const SR: typeof window.SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (!SR) return null;
-      const rec: SpeechRecognition = new SR();
+      const rec: LocalSpeechRecognition = new SR();
       // Keep listening across short pauses; collect interim results
       rec.continuous = true;
       rec.interimResults = true;
