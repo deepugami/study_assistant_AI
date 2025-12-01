@@ -43,12 +43,12 @@ export async function POST(req: Request) {
   const { message, deep } = parsed.data;
 
   const db = getDb();
-  let chatId = s.currentInterviewChatId;
+  let chatId = session.currentInterviewChatId;
   if (!chatId) {
     chatId = uuid();
-    db.prepare("INSERT INTO chats (id, userId, createdAt) VALUES (?, ?, ?)\").run(chatId, s.userId, new Date().toISOString());
-    s.currentInterviewChatId = chatId;
-    try { await s.save(); } catch {}
+    db.prepare("INSERT INTO chats (id, userId, createdAt) VALUES (?, ?, ?)").run(chatId, session.userId, new Date().toISOString());
+    session.currentInterviewChatId = chatId;
+    try { await session.save(); } catch {}
   }
 
   // Persist user message
