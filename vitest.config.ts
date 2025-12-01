@@ -8,7 +8,10 @@ export default defineConfig({
   },
   css: {
     // Disable reading root PostCSS config during tests to avoid plugin issues
-    postcss: null,
+    // by providing an empty PostCSS config (no plugins)
+    postcss: {
+      plugins: [],
+    },
   },
   resolve: {
     alias: {
