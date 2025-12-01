@@ -16,7 +16,8 @@ export async function GET() {
   const session = await getSession();
   const db = getDb();
   // Always reset to a fresh interview session on page load/refresh
-  const prevChatId = session.currentInterviewChatId;
+  const s = session as unknown as import("iron-session").IronSession<{ currentInterviewChatId?: string; userId?: string; currentDocIds?: string[] }>;
+  const prevChatId = s.currentInterviewChatId;
   if (prevChatId) {
     try {
       db.prepare("DELETE FROM messages WHERE chatId = ?").run(prevChatId);
@@ -42,12 +43,12 @@ export async function POST(req: Request) {
   const { message, deep } = parsed.data;
 
   const db = getDb();
-  let chatId = session.currentInterviewChatId;
+  let chatId = s.currentInterviewChatId;
   if (!chatId) {
     chatId = uuid();
-    db.prepare("INSERT INTO chats (id, userId, createdAt) VALUES (?, ?, ?)").run(chatId, session.userId, new Date().toISOString());
-    session.currentInterviewChatId = chatId;
-    try { await session.save(); } catch {}
+    db.prepare("INSERT INTO chats (id, userId, createdAt) VALUES (?, ?, ?)\").run(chatId, s.userId, new Date().toISOString());
+    s.currentInterviewChatId = chatId;
+    try { await s.save(); } catch {}
   }
 
   // Persist user message
