@@ -16,8 +16,7 @@ export async function GET() {
   const session = await getSession();
   const db = getDb();
   // Always reset to a fresh interview session on page load/refresh
-  const s = session as unknown as import("iron-session").IronSession<{ currentInterviewChatId?: string; userId?: string; currentDocIds?: string[] }>;
-  const prevChatId = s.currentInterviewChatId;
+  const prevChatId = session.currentInterviewChatId;
   if (prevChatId) {
     try {
       db.prepare("DELETE FROM messages WHERE chatId = ?").run(prevChatId);

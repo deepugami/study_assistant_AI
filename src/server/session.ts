@@ -1,9 +1,10 @@
-import { IronSession, getIronSession } from "iron-session";
+import { getIronSession, IronSession, IronSessionData } from "iron-session";
 import { cookies } from "next/headers";
 
 export type SessionData = {
   userId?: string;
   currentDocIds?: string[];
+  currentInterviewChatId?: string;
 };
 
 const sessionOptions = {
@@ -17,15 +18,17 @@ const sessionOptions = {
   },
 };
 
-export async function getSession(): Promise<IronSession<SessionData>> {
+type AugmentedSession = IronSession<IronSessionData>;
+
+export async function getSession(): Promise<AugmentedSession> {
   const cookieStore = await cookies();
-  const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
+  const session = await getIronSession<IronSessionData>(cookieStore, sessionOptions);
   // Remove auth: ensure a default public user id so APIs can operate without login
   if (!session.userId) {
     session.userId = "public";
     try { await session.save(); } catch {}
   }
-  return session;
+  return session as AugmentedSession;
 }
 
 

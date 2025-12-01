@@ -1,0 +1,11 @@
+import "iron-session";
+
+declare module "iron-session" {
+  interface IronSessionData {
+    userId?: string;
+    currentDocIds?: string[];
+    currentInterviewChatId?: string;
+  }
+}
+
+export {};
