@@ -21,8 +21,6 @@ Files included in this part:
 - `src/components/BackgroundCircles.tsx`
 - `src/components/AIChatCard.tsx`
 
-Update (2026-01-14): Chat UI in `AIChatCard` now uses a minimal/glassy layout with labeled bubbles; dashboard navigation offers Chat/MCQ/Comprehensive plus Home and splits the upload CTA into "Upload file" and placeholder "Paste link"; tests now run in MCQ or Comprehensive modes (legacy "long" normalized, "short" removed).
-
 ---
 
 ## File: `src/lib/utils.ts`

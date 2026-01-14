@@ -35,12 +35,6 @@ export default function AIChatCard({ className }: { className?: string }) {
         body: JSON.stringify({ message: q, deep }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = data?.error || "⚠️ AI request failed.";
-        const details = data?.details ? `\n${String(data.details)}` : "";
-        setMessages(prev => [...prev, { sender: "ai", text: `${msg}${details}` }]);
-        return;
-      }
       const answer = data?.answer ?? "(no answer)";
       setMessages(prev => [...prev, { sender: "ai", text: answer }]);
     } catch {
@@ -50,98 +44,81 @@ export default function AIChatCard({ className }: { className?: string }) {
     }
   }
 
-  const canSend = Boolean(input.trim());
-
   return (
-    <div className={cn("relative w-[94vw] max-w-[1040px] h-[76vh] min-h-[560px] rounded-3xl p-[2px] mb-8", className)}>
-      <GlowingEffect glow blur={18} spread={36} proximity={72} movementDuration={1.2} borderWidth={2} disabled={false} />
+    <div className={cn("relative w-[90vw] max-w-[900px] h-[72vh] min-h-[560px] rounded-2xl p-[2px] mb-8", className)}>
+      {/* Glow border effect */}
+      <GlowingEffect glow blur={16} spread={28} proximity={64} movementDuration={1.6} borderWidth={2} disabled={false} />
 
-      <div className="relative flex flex-col w-full h-full rounded-2xl border border-white/10 overflow-hidden bg-black/85 backdrop-blur-xl shadow-2xl">
+      {/* Inner Card */}
+      <div className="relative flex flex-col w-full h-full rounded-xl border border-white/10 overflow-hidden bg-black/90 backdrop-blur-xl">
+        {/* Inner Animated Background */}
         <motion.div
-          className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.06),transparent_40%),radial-gradient(circle_at_80%_10%,rgba(255,255,255,0.04),transparent_35%),linear-gradient(145deg,rgba(255,255,255,0.05),transparent)]"
-          animate={{ opacity: [0.7, 1, 0.85, 1] }}
-          transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute inset-0 bg-gradient-to-br from-gray-800 via-black to-gray-900"
+          animate={{ backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          style={{ backgroundSize: "200% 200%" }}
         />
 
+        {/* Background overlay removed per request */}
+
         {/* Header */}
-        <div className="relative z-10 px-6 py-4 border-b border-white/10 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-white/50">Chat with AI</p>
-            <h2 className="text-2xl font-semibold text-white">Assistant</h2>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-emerald-200 bg-emerald-400/10 px-3 py-1.5 rounded-full border border-emerald-300/30">
-            <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" aria-hidden />
-            Live
-          </div>
+        <div className="px-4 py-3 border-b border-white/10 relative z-10">
+          <h2 className="text-lg font-semibold text-white">🤖 AI Assistant</h2>
         </div>
 
         {/* Messages */}
-        <div className="relative z-10 flex-1 px-6 py-5 overflow-y-auto space-y-4 text-sm flex flex-col">
+        <div className="flex-1 px-4 py-3 overflow-y-auto space-y-3 text-sm flex flex-col relative z-10">
           {messages.map((msg, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25 }}
+              transition={{ duration: 0.4 }}
               className={cn(
-                "max-w-[78%] rounded-2xl px-4 py-3 shadow-sm border backdrop-blur",
+                "px-3 py-2 rounded-xl max-w-[80%] shadow-md backdrop-blur-md",
                 msg.sender === "ai"
-                  ? "self-start bg-white/6 border-white/10 text-white"
-                  : "self-end bg-white text-black border-white/30"
+                  ? "bg-white/10 text-white self-start"
+                  : "bg-white/30 text-black font-semibold self-end"
               )}
             >
-              <p className="text-[11px] uppercase tracking-[0.12em] mb-1 text-white/60">
-                {msg.sender === "ai" ? "Assistant" : "You"}
-              </p>
-              <p className="leading-relaxed whitespace-pre-wrap text-sm">{msg.text}</p>
+              {msg.text}
             </motion.div>
           ))}
 
+          {/* AI Typing Indicator */}
           {isTyping && (
             <motion.div
-              className="self-start bg-white/6 border border-white/10 text-white rounded-2xl px-4 py-3 inline-flex items-center gap-2 shadow-sm"
+              className="flex items-center gap-1 px-3 py-2 rounded-xl max-w-[30%] bg-white/10 self-start"
               initial={{ opacity: 0 }}
-              animate={{ opacity: [0.6, 1, 0.8, 1] }}
+              animate={{ opacity: [0, 1, 0.6, 1] }}
               transition={{ repeat: Infinity, duration: 1.2 }}
             >
-              <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-              <span className="h-2 w-2 rounded-full bg-white animate-pulse delay-150" />
-              <span className="h-2 w-2 rounded-full bg-white animate-pulse delay-300" />
-              <span className="text-xs text-white/80">Thinking…</span>
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse delay-200"></span>
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse delay-400"></span>
             </motion.div>
           )}
         </div>
 
         {/* Input */}
-        <div className="relative z-10 border-t border-white/10 px-6 py-4 bg-black/60 backdrop-blur">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <label className="flex items-center gap-2 text-xs text-white/70">
-              <input type="checkbox" checked={deep} onChange={(e) => setDeep(e.target.checked)} className="accent-white" />
-              Deep explanation
-            </label>
-            <div className="flex items-center gap-2 w-full">
-              <div className="flex items-center gap-2 w-full bg-white/5 border border-white/10 rounded-full px-4 py-2 focus-within:ring-2 focus-within:ring-white/40">
-                <input
-                  className="flex-1 bg-transparent text-sm text-white placeholder:text-white/40 focus:outline-none"
-                  placeholder="Ask anything about your documents..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                />
-              </div>
-              <button
-                onClick={handleSend}
-                disabled={!canSend}
-                className={cn(
-                  "h-11 w-11 rounded-full border border-white/15 flex items-center justify-center transition-colors",
-                  canSend ? "bg-white text-black hover:bg-white/90" : "bg-white/10 text-white/50 cursor-not-allowed"
-                )}
-                aria-label="Send message"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+        <div className="flex items-center gap-2 p-3 border-t border-white/10 relative z-10">
+          <label className="flex items-center gap-2 text-xs text-white/80">
+            <input type="checkbox" checked={deep} onChange={(e) => setDeep(e.target.checked)} />
+            Deep explanation
+          </label>
+          <input
+            className="flex-1 px-3 py-2 text-sm bg-black/50 rounded-lg border border-white/10 text-white focus:outline-none focus:ring-1 focus:ring-white/50"
+            placeholder="Type a message..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          />
+          <button
+            onClick={handleSend}
+            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <Send className="w-4 h-4 text-white" />
+          </button>
         </div>
       </div>
 

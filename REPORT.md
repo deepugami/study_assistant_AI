@@ -63,9 +63,7 @@ This report lists only the technical design: what is used and how it is used. It
 - Diagnostics endpoint (`GET /api/diag/ai`): probes configured Gemini text/embedding models and lists available models; useful for environment checks.
 - Session freshness: full page reload clears active document scope; navigation between pages preserves scope (`SessionFreshReset`).
 - Dashboard gating: Chat/Test routes are gated by `active-docs`; actions blocked until a file is uploaded.
-- Test modes: MCQ and Comprehensive (legacy "long" alias); local MCQ/Comprehensive fallbacks remain when AI is unavailable.
-- Dashboard navigation: three vertical actions (Chat, MCQ, Comprehensive) plus Home; upload CTA split into "Upload file" and placeholder "Paste link".
-- Chat UI: refreshed minimal/glassy layout with clearer sender labels and pill input.
+- Test fallbacks: local MCQ generator added; Short/Long fallbacks retained.
 - Background overlay: full‑viewport fix in `BackgroundPaths.tsx` used by Chat/Test pages.
 - Basic CI: added GitHub Actions workflow (`.github/workflows/ci.yml`) to run lint and build on push/PR.
 - Initial tests: added Vitest with unit tests for `chunkText`, similarity ordering via `topKSimilar`, and `POST /api/test` input validation; configured Vitest to avoid PostCSS plugin loading during tests.

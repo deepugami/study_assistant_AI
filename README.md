@@ -1,10 +1,10 @@
 ## Study Assistant
 
-A local-first app to upload notes (PDF/DOCX/TXT), chat with them (RAG), and generate tests (MCQ/Comprehensive).
+A local-first app to upload notes (PDF/DOCX/TXT), chat with them (RAG), and generate tests (MCQ/Short/Long).
 
 Features:
 - Chat grounded on your uploaded notes (RAG)
-- Generate tests (MCQ/Comprehensive) with local fallbacks
+- Generate tests (MCQ/Short/Long) with local fallbacks
 - Interview (voice): browser ASR + TTS with resume-grounded questions
 
 ### Prerequisites
@@ -39,15 +39,15 @@ Browser notes:
 
 1) Go to Dashboard and upload 1–3 files (PDF/DOCX/TXT). Wait for processing to finish.
 2) Use the Dashboard buttons to navigate:
-  - Chat — ask grounded questions about your notes (modern minimal UI).
-  - Test — MCQ/Comprehensive modes to generate and answer questions.
-  - If no file is uploaded, navigation is blocked and a toast appears on the Dashboard.
+   - Chat — ask grounded questions about your notes.
+   - Test — MCQ/Short/Long modes to generate and answer questions.
+   - If no file is uploaded, navigation is blocked and a toast appears on the Dashboard.
 3) After a full page refresh, the session clears the active docs for safety. Upload again to start a new session.
 
 Notes:
 - With an API key, the app uses Gemini for generation; without it, tests fall back locally and chat provides a conservative fallback.
 - Data stays local in SQLite; uploads are parsed on your machine.
-- Voice interview: click the recorder, speak, then wait for the interviewer’s reply by voice. If ASR is unsupported, try Chrome.
+ - Voice interview: click the recorder, speak, then wait for the interviewer’s reply by voice. If ASR is unsupported, try Chrome.
 
 ### Scripts
 

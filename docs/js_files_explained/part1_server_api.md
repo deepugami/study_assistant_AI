@@ -18,8 +18,6 @@ Files included in this part:
 - `src/app/api/diag/ai/route.ts`
 - `src/app/api/state/active-docs/route.ts`
 
-Update (2026-01-14): Test generation now supports only MCQ and Comprehensive modes (legacy "long" is normalized to Comprehensive; "short" removed). Chat UI is minimal/glassy; dashboard navigation uses Chat/MCQ/Comprehensive.
-
 ---
 
 ## File: `src/server/ai.ts`

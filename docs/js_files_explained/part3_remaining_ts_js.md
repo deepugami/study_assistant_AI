@@ -8,8 +8,6 @@ Files included:
 - `src/app/(auth)/signup/page.tsx`
 - `src/app/(auth)/login/page.tsx`
 
-Update (2026-01-14): Core app modes now MCQ/Comprehensive and chat UI refreshed; auth pages remain redirects to dashboard.
-
 ---
 
 ## File: `src/types/ambient.d.ts`
